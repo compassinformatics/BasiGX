@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>The source code</title>
+  <link href="../resources/prettify/prettify.css" type="text/css" rel="stylesheet" />
+  <script type="text/javascript" src="../resources/prettify/prettify.js"></script>
+  <style type="text/css">
+    .highlight { display: block; background-color: #ddd; }
+  </style>
+  <script type="text/javascript">
+    function highlight() {
+      document.getElementById(location.hash.replace(/#/, "")).className = "highlight";
+    }
+  </script>
+</head>
+<body onload="prettyPrint(); highlight();">
+  <pre class="prettyprint lang-js">/* Copyright (c) 2016-present terrestris GmbH &amp; Co. KG
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+<span id='BasiGX-model-Projection'>/**
+</span> * Projection model for use with the Projections Store
+ *
+ * @class BasiGX.model.Projection
+ */
+Ext.define(&#39;BasiGX.model.Projection&#39;, {
+    extend: &#39;Ext.data.Model&#39;,
+<span id='BasiGX-model-Projection-cfg-idProperty'>    idProperty: &#39;code&#39;,
+</span><span id='BasiGX-model-Projection-property-fields'>    fields: [{
+</span>        name: &#39;code&#39;,
+        type: &#39;int&#39;
+    }, {
+        name: &#39;accuracy&#39;,
+        type: &#39;string&#39;
+    }, {
+        name: &#39;area&#39;,
+        type: &#39;string&#39;
+    }, {
+        name: &#39;authority&#39;,
+        type: &#39;string&#39;
+    }, {
+        name: &#39;bbox&#39;,
+        type: &#39;auto&#39;
+    }, {
+        name: &#39;default_trans&#39;,
+        type: &#39;number&#39;
+    }, {
+        name: &#39;kind&#39;,
+        type: &#39;string&#39;
+    }, {
+        name: &#39;name&#39;,
+        type: &#39;string&#39;
+    }, {
+        name: &#39;proj4&#39;,
+        type: &#39;string&#39;
+    }, {
+        name: &#39;trans&#39;,
+        type: &#39;auto&#39;
+    }, {
+        name: &#39;unit&#39;,
+        type: &#39;string&#39;
+    }, {
+        name: &#39;wkt&#39;,
+        type: &#39;string&#39;
+    }]
+});
+</pre>
+</body>
+</html>

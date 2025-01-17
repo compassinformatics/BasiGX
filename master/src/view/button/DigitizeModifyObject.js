@@ -108,12 +108,12 @@ Ext.define('BasiGX.view.button.DigitizeModifyObject', {
                 me.modifyInteraction.setActive(true);
                 me.modifySelectInteraction.setActive(true);
                 me.modifyInteraction.on('modifyend',
-                    me.fireFeatureChanged, me);
+                    me.fireFeatureChanged);
             } else {
                 me.modifyInteraction.setActive(false);
                 me.modifySelectInteraction.setActive(false);
                 me.modifyInteraction.un('modifyend',
-                    me.fireFeatureChanged, me);
+                    me.fireFeatureChanged);
             }
         },
         beforedestroy: function() {
@@ -127,10 +127,20 @@ Ext.define('BasiGX.view.button.DigitizeModifyObject', {
     },
 
     /**
-     * Fire a change event to inform other components
+     *
      */
-    fireFeatureChanged: function() {
-        this.fireEvent('featurechanged');
+    constructor: function() {
+        var me = this;
+        me.fireFeatureChanged = me.fireFeatureChanged.bind(this);
+        me.callParent(arguments);
+    },
+
+    /**
+     * Fire a change event to inform other components
+     * @param {ol.source.Vector.VectorSourceEvent} evt The openlayers event.
+     */
+    fireFeatureChanged: function(evt) {
+        this.fireEvent('featurechanged', evt);
     },
 
     /**

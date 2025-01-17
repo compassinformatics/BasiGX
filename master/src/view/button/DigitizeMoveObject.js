@@ -118,12 +118,12 @@ Ext.define('BasiGX.view.button.DigitizeMoveObject', {
                 me.translateInteraction.setActive(true);
                 me.translateSelectInteraction.setActive(true);
                 me.translateInteraction.on('translateend',
-                    me.fireFeatureChanged, me);
+                    me.fireFeatureChanged);
             } else {
                 me.translateInteraction.setActive(false);
                 me.translateSelectInteraction.setActive(false);
                 me.translateInteraction.un('translateend',
-                    me.fireFeatureChanged, me);
+                    me.fireFeatureChanged);
             }
         },
         beforedestroy: function() {
@@ -137,9 +137,19 @@ Ext.define('BasiGX.view.button.DigitizeMoveObject', {
     },
 
     /**
-     * Fire a change event to inform other components
+     *
      */
-    fireFeatureChanged: function() {
-        this.fireEvent('featurechanged');
+    constructor: function() {
+        var me = this;
+        me.fireFeatureChanged = me.fireFeatureChanged.bind(this);
+        me.callParent(arguments);
+    },
+
+    /**
+     * Fire a change event to inform other components
+     * @param {ol.source.Vector.VectorSourceEvent} evt The openlayers event.
+     */
+    fireFeatureChanged: function(evt) {
+        this.fireEvent('featurechanged', evt);
     }
 });

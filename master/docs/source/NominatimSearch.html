@@ -76,7 +76,7 @@ Ext.define(&#39;BasiGX.view.container.NominatimSearch&#39;, {
 <span id='BasiGX-view-container-NominatimSearch-cfg-nominatimUrl'>        /**
 </span>         * The URL to the nominatim service
          */
-        nominatimUrl: &#39;https://nominatim.openstreetmap.org&#39;,
+        nominatimUrl: &#39;https://nominatim.terrestris.de&#39;,
 
 <span id='BasiGX-view-container-NominatimSearch-cfg-format'>        /**
 </span>         *
@@ -282,7 +282,9 @@ Ext.define(&#39;BasiGX.view.container.NominatimSearch&#39;, {
         if (!me.searchResultVectorLayer) {
             me.searchResultVectorLayer = new ol.layer.Vector({
                 name: &#39;nominatimsearchresult&#39;,
-                source: new ol.source.Vector(),
+                source: new ol.source.Vector({
+                    features: new ol.Collection()
+                }),
                 style: me.getSearchResultFeatureStyle(),
                 visible: !me.clusterResults
             });
@@ -652,7 +654,7 @@ Ext.define(&#39;BasiGX.view.container.NominatimSearch&#39;, {
         }
         if (feature) {
             this.flashListenerKey = BasiGX.util.Animate.flashFeature(
-                feature, 1000, radius);
+                feature, 1000, radius, me.searchResultVectorLayer);
         }
     },
 

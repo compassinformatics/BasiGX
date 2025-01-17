@@ -41,18 +41,52 @@ Ext.define(&#39;BasiGX.view.grid.FeatureGrid&#39;, {
     xtype: &#39;basigx-grid-featuregrid&#39;,
     extend: &#39;Ext.panel.Panel&#39;,
     requires: [
+        &#39;Ext.Array&#39;,
+        &#39;Ext.Component&#39;,
+        &#39;Ext.container.ButtonGroup&#39;,
+        &#39;Ext.grid.filters.Filters&#39;,
+        &#39;Ext.grid.plugin.CellEditing&#39;,
+        &#39;Ext.util.DelayedTask&#39;,
+        &#39;BasiGX.util.WFST&#39;,
+        &#39;BasiGX.view.button.DigitizePoint&#39;,
+        &#39;BasiGX.view.button.DigitizeLine&#39;,
+        &#39;BasiGX.view.button.DigitizePolygon&#39;,
+        &#39;BasiGX.view.button.DigitizeModifyObject&#39;,
+        &#39;BasiGX.view.button.DigitizeMoveObject&#39;,
+        &#39;BasiGX.view.button.DigitizeDeleteObject&#39;,
         &#39;GeoExt.data.store.Features&#39;
     ],
 
-<span id='BasiGX-view-grid-FeatureGrid-property-viewModel'>    viewModel: {
+<span id='BasiGX-view-grid-FeatureGrid-cfg-viewModel'>    viewModel: {
 </span>        data: {
             renameButton: &#39;Umbenennen&#39;,
             renameBox: &#39;Bitte geben Sie den neuen Spaltennamen an:&#39;,
             deleteTitle: &#39;Löschen&#39;,
-            deleteQuestion: &#39;Wollen Sie die Spalte wirklich löschen?&#39;
+            deleteQuestion: &#39;Wollen Sie die Spalte wirklich löschen?&#39;,
+            saveButton: &#39;Speichern&#39;,
+            cancelButton: &#39;Abbrechen&#39;,
+            reloadButton: &#39;Neu laden&#39;,
+            saveErrorText: &#39;Änderungen konnten nicht gespeichert werden.&#39;,
+            saveSuccessText: &#39;Änderungen erfolgreich gespeichert.&#39;,
+            saveReminderText: &#39;Sie haben seit über {0}min nicht mehr &#39; +
+                &#39;gespeichert. Bitte speichern Sie regelmäßig.&#39;,
+            editGeometryButton: &#39;Geometrie editieren&#39;,
+            removeGeometryButton: &#39;Geometrie entfernen&#39;,
+            moveGeometryButton: &#39;Geometrie bewegen&#39;,
+            addPointButton: &#39;Punkt hinzufügen&#39;,
+            addLineButton: &#39;Linie hinzufügen&#39;,
+            addPolygonButton: &#39;Polygon hinzufügen&#39;,
+            featuresWithModifiedGeometries: [],
+            featuresWithRemovedGeometries: [],
+            newFeaturesAdded: false,
+            isEditing: false,
+            showSaveReminder: false,
+            saveReminderTask: undefined
         }
     },
 
+<span id='BasiGX-view-grid-FeatureGrid-cfg-height'>    height: 500,
+</span>
     config: {
 <span id='BasiGX-view-grid-FeatureGrid-property-layer'>        /**
 </span>         * The layer with the features to display in the grid.
@@ -83,44 +117,183 @@ Ext.define(&#39;BasiGX.view.grid.FeatureGrid&#39;, {
          * rows are considered smaller than non selected rows).
          * @type {boolean}
          */
-        addZoomButton: false
+        addZoomButton: false,
+
+        /* eslint-disable */
+<span id='BasiGX-view-grid-FeatureGrid-cfg-enableLocking'>        /**
+</span>         * Configures locking on the grid. See https://docs.sencha.com/extjs/6.2.0/classic/Ext.grid.Panel.html#cfg-enableLocking
+         */
+        enableLocking: true,
+<span id='BasiGX-view-grid-FeatureGrid-cfg-gridHeader'>        /**
+</span>         * Configures the grid header. See https://docs.sencha.com/extjs/6.2.0/classic/Ext.grid.Panel.html#cfg-header
+         */
+        gridHeader: undefined,
+
+<span id='BasiGX-view-grid-FeatureGrid-cfg-gridToolbarHeight'>        /**
+</span>         * Height of grid toolbar. Defaults to 50px.
+         */
+        gridToolbarHeight: 50,
+
+        /* eslint-enable */
+<span id='BasiGX-view-grid-FeatureGrid-cfg-enableFiltering'>        /**
+</span>         * Configures filtering on the grid.
+         */
+        enableFiltering: false,
+<span id='BasiGX-view-grid-FeatureGrid-cfg-enableEditing'>        /**
+</span>         * Configures editing of the grid.
+         */
+        enableEditing: false,
+<span id='BasiGX-view-grid-FeatureGrid-cfg-enableRefreshButton'>        /**
+</span>        * Configures the visibility of the refresh button of the grid.
+        */
+        enableRefreshButton: false,
+<span id='BasiGX-view-grid-FeatureGrid-cfg-geometryTypes'>        /**
+</span>         * List of supported geometry types.
+         * Following strings are supported:
+         *
+         * &quot;Point&quot;, &quot;MultiPoint&quot;, &quot;LineString&quot;,
+         * &quot;MulitLineString&quot;, &quot;Polygon&quot;, &quot;MultiPolygon&quot;
+         */
+        geometryTypes: [],
+<span id='BasiGX-view-grid-FeatureGrid-cfg-enableColumnRenaming'>        /**
+</span>         * Allows/disallows renaming a column.
+         */
+        enableColumnRenaming: true,
+<span id='BasiGX-view-grid-FeatureGrid-cfg-enableColumnRemoving'>        /**
+</span>         * Allows/disallows removing a column.
+         */
+        enableColumnRemoving: true,
+<span id='BasiGX-view-grid-FeatureGrid-cfg-saveReminderDelay'>        /**
+</span>         * Time in ms in which the saveReminder should
+         * be shown. Time starts after the first edit.
+         * Defaults to 10min.
+         */
+        saveReminderDelay: 10 * 60 * 1000,
+<span id='BasiGX-view-grid-FeatureGrid-cfg-exampleFeature'>        /**
+</span>         * An example GeoJSON feature object that will be used to extract the schema
+         * in case no features are in the store.
+         */
+        exampleFeature: null,
+<span id='BasiGX-view-grid-FeatureGrid-cfg-zoomPadding'>        /**
+</span>         * The padding to use when zooming to features.
+         * Can be a single number or an array of numbers.
+         */
+        zoomPadding: 0,
+<span id='BasiGX-view-grid-FeatureGrid-cfg-maxZoom'>        /**
+</span>         * The max zoom to use when zooming to features.
+        */
+        maxZoom: undefined
     },
 
-<span id='BasiGX-view-grid-FeatureGrid-property-items'>    items: [{
-</span>        xtype: &#39;grid&#39;,
-        selModel: &#39;checkboxmodel&#39;,
-        enableLocking: true,
-        plugins: {
-            ptype: &#39;cellediting&#39;,
-            clicksToEdit: 1
-        },
-        listeners: {
-            cellclick: function(view, td, colIdx, record) {
-                var grid = this.up(&#39;basigx-grid-featuregrid&#39;);
-                var mapView = grid.getMap().map.getView();
-                if (grid.getAddZoomButton()) {
-                    if (colIdx === 1 &amp;&amp; record.olObject.getGeometry()) {
-                        mapView.fit(record.olObject.getGeometry(), {
-                            duration: 300
-                        });
-                    }
-                }
-            }
-        }
-    }],
+<span id='BasiGX-view-grid-FeatureGrid-property-editLayer'>    editLayer: undefined,
+</span><span id='BasiGX-view-grid-FeatureGrid-property-items'>    items: [],
+</span>
+<span id='BasiGX-view-grid-FeatureGrid-cfg-layout'>    layout: {
+</span>        type: &#39;vbox&#39;,
+        align: &#39;stretch&#39;
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-constructor'>    constructor: function() {
+</span>        var me = this;
+
+        me.selectionFeatureAdded = me.selectionFeatureAdded.bind(me);
+        me.selectionFeatureRemoved = me.selectionFeatureRemoved.bind(me);
+        me.onChangeFeature = me.onChangeFeature.bind(me);
+        me.onAddFeature = me.onAddFeature.bind(me);
+        me.onRemoveFeature = me.onRemoveFeature.bind(me);
+        me.callParent(arguments);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-event-geometrieseditedandsaved'>    /**
+</span>     * @event geometrieseditedandsaved
+     * Fires when geometries were edited and saved.
+     * This can be useful for reloading the original
+     * layer, if included as WMS.
+     */
+
+<span id='BasiGX-view-grid-FeatureGrid-event-reloadgrid'>    /**
+</span>     * @event reloadgrid
+     * Fires when the reload button was clicked.
+     * This can be used to trigger reloading of
+     * the data and updating the grid, accordingly.
+     */
 
 <span id='BasiGX-view-grid-FeatureGrid-method-initComponent'>    /**
 </span>     *
      */
     initComponent: function() {
+        var me = this;
         this.callParent();
+        var gridHeight = this.height;
+        if (this.enableEditing || this.enableRefreshButton) {
+            gridHeight = gridHeight - this.getGridToolbarHeight();
+        }
+        var gridOpts = {
+            xtype: &#39;grid&#39;,
+            flex: 1,
+            height: gridHeight,
+            forceFit: true,
+            selModel: &#39;checkboxmodel&#39;,
+            enableLocking: this.getEnableLocking(),
+            header: this.getGridHeader(),
+            plugins: [
+                {
+                    ptype: &#39;cellediting&#39;,
+                    clicksToEdit: 1
+                },
+                &#39;gridfilters&#39;
+            ],
+            listeners: {
+                cellclick: function(view, td, colIdx, record) {
+                    var grid = this.up(&#39;basigx-grid-featuregrid&#39;);
+                    var mapView = grid.getMap().map.getView();
+                    if (grid.getAddZoomButton()) {
+                        if (colIdx === 1 &amp;&amp; record.olObject.getGeometry()) {
+                            var padding = me.getZoomPadding();
+                            if (typeof padding === &#39;number&#39;) {
+                                padding = [padding, padding, padding, padding];
+                            }
+                            if (!padding) {
+                                padding = undefined;
+                            }
+                            var maxZoom = me.getMaxZoom();
+                            mapView.fit(record.olObject.getGeometry(), {
+                                duration: 300,
+                                padding: padding,
+                                maxZoom: maxZoom
+                            });
+                        }
+                    }
+                }
+            }
+        };
+        this.createEditLayer();
+        if (this.enableEditing) {
+            this.hideEditLayer();
+            this.addEditLayerToMap();
+            this.createEditToolbar();
+        }
+        // if enableEditing is set to false but the refresh button needs
+        // to be visible, the toolbar needs to be created to show the
+        // refresh button
+        if (this.enableRefreshButton &amp;&amp; !this.enableEditing) {
+            this.createEditToolbar();
+        }
+        this.add(gridOpts);
         this.setLayerStore();
         this.registerEvents();
         this.createHighlightLayer(this.getMap());
         this.appendMenuEntries();
+        this.addListener(&#39;beforedestroy&#39;, this.onBeforeDestroy.bind(this));
         var grid = this.down(&#39;grid&#39;);
         grid.on(&#39;select&#39;, this.rowSelected, this);
         grid.on(&#39;deselect&#39;, this.rowDeselected, this);
+
+        window.setTimeout(function () {
+            // Update the map size when opening the grid
+            var map = BasiGX.util.Map.getMapComponent().map;
+            map.updateSize();
+        }, 100);
     },
 
 <span id='BasiGX-view-grid-FeatureGrid-method-setSelectionLayer'>    /**
@@ -145,11 +318,16 @@ Ext.define(&#39;BasiGX.view.grid.FeatureGrid&#39;, {
 </span>     * Append extra column menu items.
      */
     appendMenuEntries: function() {
+        var me = this;
         var grid = this.down(&#39;grid&#39;);
         var viewModel = this.getViewModel();
         var menu = grid.view.headerCt.getMenu();
-        menu.add(this.getRenameEntry(viewModel));
-        menu.add(this.getDeleteEntry(viewModel));
+        if (me.getEnableColumnRenaming()) {
+            menu.add(this.getRenameEntry(viewModel));
+        }
+        if (me.getEnableColumnRemoving()) {
+            menu.add(this.getDeleteEntry(viewModel));
+        }
     },
 
 <span id='BasiGX-view-grid-FeatureGrid-method-getRenameEntry'>    /**
@@ -245,11 +423,25 @@ Ext.define(&#39;BasiGX.view.grid.FeatureGrid&#39;, {
             return;
         }
         this.highlightSource = new ol.source.Vector();
+
+        var color = [255, 0, 0, 0.3];
+        var stroke = new ol.style.Stroke({
+            color: color,
+            width: 1
+        });
+        var fill = new ol.style.Fill({
+            color: color
+        });
+
         this.highlightLayer = new ol.layer.Vector({
             style: new ol.style.Style({
-                fill: new ol.style.Fill({
-                    color: [255, 0, 0, 0.3]
-                })
+                image: new ol.style.Circle({
+                    fill: fill,
+                    stroke: stroke,
+                    radius: 5
+                }),
+                fill: fill,
+                stroke: stroke
             }),
             source: this.highlightSource
         });
@@ -283,12 +475,81 @@ Ext.define(&#39;BasiGX.view.grid.FeatureGrid&#39;, {
         }
     },
 
+<span id='BasiGX-view-grid-FeatureGrid-method-registerEditingEvents'>    /**
+</span>     * Register all editing events.
+     */
+    registerEditingEvents: function() {
+        var me = this;
+        me.editLayer.getSource().on(&#39;removefeature&#39;, me.onRemoveFeature);
+        me.editLayer.getSource().on(&#39;addfeature&#39;, me.onAddFeature);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-unregisterEditingEvents'>    /**
+</span>     * Unregister all editing events.
+     */
+    unregisterEditingEvents: function() {
+        var me = this;
+        me.editLayer.getSource().un(&#39;removefeature&#39;, me.onRemoveFeature);
+        me.editLayer.getSource().un(&#39;addfeature&#39;, me.onAddFeature);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-onChangeFeature'>    /**
+</span>     * Handler for the change feature event.
+     * @param {ol.Feature} feature The changed feature.
+     */
+    onChangeFeature: function(feature) {
+        var me = this;
+        var vm = me.getViewModel();
+        me.startEditingFeature();
+        var idField = me.layer.getProperties().idField;
+        var featureId = feature.getProperties()[idField];
+        var modifiedFeatures = vm.get(&#39;featuresWithModifiedGeometries&#39;);
+        Ext.Array.include(modifiedFeatures, featureId);
+        vm.set(&#39;featuresWithModifiedGeometries&#39;, modifiedFeatures);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-onRemoveFeature'>    /**
+</span>     * Handler for the remove feature event.
+     * @param {ol.source.Vector.VectorSourceEvent} evt removefeature
+     */
+    onRemoveFeature: function(evt) {
+        var me = this;
+        var vm = me.getViewModel();
+        me.startEditingFeature();
+        var idField = me.layer.getProperties().idField;
+        var featureId = evt.feature.getProperties()[idField];
+        var removedFeatures = vm.get(&#39;featuresWithRemovedGeometries&#39;);
+        Ext.Array.include(removedFeatures, featureId);
+        vm.set(&#39;featuresWithRemovedGeometries&#39;, removedFeatures);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-onAddFeature'>    /**
+</span>     * Handler for the add feature event.
+     */
+    onAddFeature: function() {
+        var me = this;
+        var vm = me.getViewModel();
+        me.startEditingFeature();
+        vm.set(&#39;newFeaturesAdded&#39;, true);
+    },
+
 <span id='BasiGX-view-grid-FeatureGrid-method-setLayerStore'>    /**
 </span>     * Sets the layer store on the grid.
      */
     setLayerStore: function() {
+        var me = this;
         var store = new GeoExt.data.store.Features({
-            layer: this.getLayer()
+            layer: this.editLayer,
+            listeners: {
+                update: function(st, rec, operation) {
+                    // We do not want to trigger the editing
+                    // when changes were committed.
+                    if (operation === &#39;commit&#39;) {
+                        return;
+                    }
+                    me.startEditingFeature();
+                }
+            }
         });
 
         this.reconfigureStore(store);
@@ -340,7 +601,7 @@ Ext.define(&#39;BasiGX.view.grid.FeatureGrid&#39;, {
         var columns = [];
         if (this.getAddZoomButton()) {
             columns.push({
-                minWidth: 35,
+                maxWidth: 35,
                 menuDisabled: true,
                 enableColumnHide: false,
                 hideable: false,
@@ -351,12 +612,16 @@ Ext.define(&#39;BasiGX.view.grid.FeatureGrid&#39;, {
                     return &#39;&lt;span class=&quot;fa fa-search&quot; &#39; +
                         &#39;style=&quot;cursor: pointer;&quot;&gt;&lt;/span&gt;&#39;;
                 },
-                width: 32,
                 sorter: this.selectionCompareFunction.bind(this)
             });
         }
-        var data = store.getData().items;
+        var data = store.getData().items.slice();
         var attributes = [];
+        if (data.length === 0 &amp;&amp; this.getExampleFeature()) {
+            data.push({
+                data: this.getExampleFeature().properties
+            });
+        }
         if (data.length &gt; 0) {
             Ext.each(data, function(item) {
                 Ext.iterate(item.data, function(key, value) {
@@ -371,11 +636,16 @@ Ext.define(&#39;BasiGX.view.grid.FeatureGrid&#39;, {
             });
         }
         Ext.each(attributes, function(attribute) {
-            columns.push({
+            var col = {
                 text: attribute,
                 dataIndex: attribute,
-                editor: &#39;textfield&#39;
-            });
+                filter: me.enableFiltering
+            };
+            var isIdField = attribute === me.layer.getProperties().idField;
+            if (me.enableEditing &amp;&amp; !isIdField) {
+                col.editor = &#39;textfield&#39;;
+            }
+            columns.push(col);
         });
         return columns;
     },
@@ -492,14 +762,577 @@ Ext.define(&#39;BasiGX.view.grid.FeatureGrid&#39;, {
         }
         layer.getSource()[onOrOff](
             &#39;addfeature&#39;,
-            this.selectionFeatureAdded,
-            this
+            this.selectionFeatureAdded
         );
         layer.getSource()[onOrOff](
             &#39;removefeature&#39;,
-            this.selectionFeatureRemoved,
-            this
+            this.selectionFeatureRemoved
         );
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-onSaveClick'>    /**
+</span>     * Handler for the save button of the feature grid.
+     */
+    onSaveClick: function() {
+        var me = this;
+        var vm = me.getViewModel();
+        var grid = me.down(&#39;gridpanel&#39;);
+        grid.setLoading(true);
+        var gridStore = grid.getStore();
+        var updates = me.getModifiedFeatures(gridStore);
+        var inserts = me.getAddedFeatures(gridStore);
+        var deletes = me.getDeletedFeatures();
+
+        me.performWfst(me.layer, inserts, updates, deletes)
+            .then(function() {
+                gridStore.commitChanges();
+                grid.setLoading(false);
+                Ext.toast(vm.get(&#39;saveSuccessText&#39;));
+                // only update if geometries were edited.
+                var shouldUpdate = me.didGeometryChange();
+                vm.set(&#39;featuresWithModifiedGeometries&#39;, []);
+                vm.set(&#39;newFeaturesAdded&#39;, false);
+                vm.set(&#39;featuresWithRemovedGeometries&#39;, []);
+                me.finishEditing();
+                me.resetAllButtons();
+                if (shouldUpdate) {
+                    me.fireEvent(&#39;geometrieseditedandsaved&#39;);
+                }
+            }, function() {
+                Ext.toast(vm.get(&#39;saveErrorText&#39;));
+                me.finishEditing();
+                grid.setLoading(false);
+                me.resetAllButtons();
+            });
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-performWfst'>    /**
+</span>     * Perform a WFS-T.
+     *
+     * @param {ol.Layer} layer The layer to which the features belong.
+     * @param {ol.Feature[]} inserts List of new features.
+     * @param {ol.Feature[]} updates List of features to update.
+     * @param {ol.Feature[]} deletes List of features to delete.
+     * @return {Ext.Promise} Promise with the resolve or rejected transaction.
+     */
+    performWfst: function(layer, inserts, updates, deletes) {
+        var opts = {
+            layer: layer,
+            wfstInserts: inserts,
+            wfstUpdates: updates,
+            wfstDeletes: deletes
+        };
+        return BasiGX.util.WFST.transact(opts);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-getModifiedFeatures'>    /**
+</span>     * Get the modified features from the gridstore.
+     *
+     * @param {Ext.data.Store} store The store to get the features from.
+     * @return {ol.Feature[]} List of modified store records as features.
+     */
+    getModifiedFeatures: function(store) {
+        var me = this;
+        var vm = me.getViewModel();
+        var layerProps = me.layer.getProperties();
+        var idField = layerProps.idField;
+        var modifiedFeatures = [];
+
+        store.each(function(rec) {
+            var isNewFeature = !Ext.isDefined(rec.get(idField));
+            if (isNewFeature) {
+                return;
+            }
+            var isModified = false;
+            var modifiedFields = {};
+            var featureId = rec.get(idField);
+            var containsFeature = Ext.Array.contains(
+                vm.get(&#39;featuresWithModifiedGeometries&#39;), featureId);
+            if (containsFeature) {
+                modifiedFields.geometry = me.getEditGeometryForFeature(
+                    featureId);
+                isModified = true;
+            }
+            if (rec.dirty) {
+                Ext.Object.each(rec.getData(), function(field, value){
+                    if (rec.isModified(field)) {
+                        modifiedFields[field] = value;
+                    }
+                });
+                isModified = true;
+            }
+            if (isModified) {
+                var feature = new ol.Feature(modifiedFields);
+                feature.setId(rec.get(idField));
+                modifiedFeatures.push(feature);
+            }
+        }, undefined, {filtered: true});
+        return modifiedFeatures;
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-getDeletedFeatures'>    /**
+</span>     * Get the deleted features from the original layer.
+     *
+     * @return {ol.Feature[]} List of features to delete.
+     */
+    getDeletedFeatures: function() {
+        var me = this;
+        var vm = me.getViewModel();
+        var layerProps = me.layer.getProperties();
+        var idField = layerProps.idField;
+        var deletedFeatures = [];
+
+        var features = me.layer.getSource().getFeatures();
+        Ext.Array.each(features, function(feature) {
+            var featureId = feature.get(idField);
+            var containsFeature = Ext.Array.contains(
+                vm.get(&#39;featuresWithRemovedGeometries&#39;), featureId);
+            if (containsFeature) {
+                var f = new ol.Feature();
+                f.setId(feature.get(idField));
+                deletedFeatures.push(f);
+            }
+        });
+        return deletedFeatures;
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-getAddedFeatures'>    /**
+</span>     * Get the added features from the store.
+     *
+     * @param {Ext.data.Store} store The store to get the features from.
+     * @return {ol.Feature[]} List of features to add.
+     */
+    getAddedFeatures: function(store) {
+        var me = this;
+        var layerProps = me.layer.getProperties();
+        var idField = layerProps.idField;
+        var newFeatures = [];
+        store.each(function(rec) {
+            if (!Ext.isDefined(rec.get(idField))) {
+                var data = Ext.Object.merge({}, rec.getData());
+                delete data.id;
+                var feature = new ol.Feature(data);
+                newFeatures.push(feature);
+            }
+
+        });
+        return newFeatures;
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-didGeometryChange'>    /**
+</span>     * Check if any geometry did change.
+     *
+     * @return {boolean} True, if geometry did change. False otherwise.
+     */
+    didGeometryChange: function() {
+        var me = this;
+        var vm = me.getViewModel();
+        var wasModified = vm.get(&#39;featuresWithModifiedGeometries&#39;).length &gt; 0;
+        var wasAdded = vm.get(&#39;newFeaturesAdded&#39;);
+        var wasRemoved = vm.get(&#39;featuresWithRemovedGeometries&#39;).length &gt; 0;
+        return wasModified || wasAdded || wasRemoved;
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-createEditLayer'>    /**
+</span>     * Creates the editLayer based on the features of this.layer.
+     */
+    createEditLayer: function() {
+        var me = this;
+        var features = me.layer.getSource().getFeatures();
+        var featureClones = Ext.Array.map(features, function(feature) {
+            return feature.clone();
+        });
+        var source = new ol.source.Vector({
+            features: new ol.Collection(featureClones)
+        });
+        var editLayer = new ol.layer.Vector({
+            source: source
+        });
+        editLayer.setStyle(me.layer.getStyle());
+        editLayer.set(BasiGX.util.Layer.KEY_DISPLAY_IN_LAYERSWITCHER, false);
+        me.editLayer = editLayer;
+        me.registerEditingEvents();
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-removeEditLayer'>    /**
+</span>     * Remove the editLayer from the map and unregister
+     * the editing events.
+     */
+    removeEditLayer: function() {
+        var me = this;
+        var mapComponent = BasiGX.util.Map.getMapComponent();
+        var map = mapComponent.map;
+        map.removeLayer(me.editLayer);
+        me.unregisterEditingEvents();
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-getEditGeometryForFeature'>    /**
+</span>     * Gets the geometry for the feature in the editLayer that
+     * corresponds to the given featureId.
+     * @param {Number} featureId The id to filter by.
+     * @return {o.geom.Geometry} The matching geometry.
+     */
+    getEditGeometryForFeature: function(featureId) {
+        var me = this;
+        var idField = me.layer.getProperties().idField;
+        var features = me.editLayer.getSource().getFeatures();
+        var foundFeature = Ext.Array.findBy(features, function(feature) {
+            return feature.getProperties()[idField] === featureId;
+        });
+        if (!foundFeature) {
+            return;
+        }
+        return foundFeature.getGeometry().clone();
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-addEditLayerToMap'>    /**
+</span>     * Add the editLayer to the map.
+     */
+    addEditLayerToMap: function() {
+        var me = this;
+        var mapComponent = BasiGX.util.Map.getMapComponent();
+        var map = mapComponent.map;
+        map.addLayer(me.editLayer);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-showEditLayer'>    /**
+</span>     * Show the editLayer.
+     */
+    showEditLayer: function() {
+        var me = this;
+        me.editLayer.setOpacity(1);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-hideEditLayer'>    /**
+</span>     * Hide the editLayer.
+     */
+    hideEditLayer: function() {
+        var me = this;
+        me.editLayer.setOpacity(0);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-onBeforeDestroy'>    /**
+</span>     * The handler for the beforedestroy event.
+     */
+    onBeforeDestroy: function() {
+        var me = this;
+        var vm = me.getViewModel();
+
+        if (me.enableEditing) {
+            me.removeEditLayer();
+            me.editLayer = undefined;
+        }
+
+        var task = vm.get(&#39;saveReminderTask&#39;);
+        if (task) {
+            task.cancel();
+        }
+
+        window.setTimeout(function () {
+            // Update the map size when closing the grid
+            var map = BasiGX.util.Map.getMapComponent().map;
+            map.updateSize();
+        }, 100);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-getCellEditingPlugin'>    /**
+</span>     * Get the cellediting plugin of the grid.
+     *
+     * @return {Ext.grid.plugin.CellEditing} The cellediting plugin, if found.
+     */
+    getCellEditingPlugin: function() {
+        var me = this;
+        var grid = me.down(&#39;grid&#39;);
+        var plugins = grid.getPlugins();
+        var editingPluginIdx = Ext.Array.findBy(plugins, function(plugin) {
+            return plugin.ptype === &#39;cellediting&#39;;
+        });
+        if (editingPluginIdx === -1) {
+            return;
+        }
+        return plugins[editingPluginIdx];
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-completeTableEditing'>    /**
+</span>     * Completes any occuring editing in the table
+     */
+    completeTableEditing: function() {
+        var me = this;
+        var editPlugin = me.getCellEditingPlugin();
+        if (editPlugin) {
+            editPlugin.completeEdit();
+        }
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-startEditingFeature'>    startEditingFeature: function() {
+</span>        var me = this;
+        var vm = me.getViewModel();
+        vm.set(&#39;isEditing&#39;, true);
+        var task = new Ext.util.DelayedTask(function() {
+            vm.set(&#39;showSaveReminder&#39;, true);
+        });
+        task.delay(me.getSaveReminderDelay());
+        vm.set(&#39;saveReminderTask&#39;, task);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-finishEditing'>    finishEditing: function() {
+</span>        var me = this;
+        var vm = me.getViewModel();
+        vm.set(&#39;isEditing&#39;, false);
+        var task = vm.get(&#39;saveReminderTask&#39;);
+        if (task) {
+            task.cancel();
+        }
+        vm.set(&#39;saveReminderTask&#39;, undefined);
+        vm.set(&#39;showSaveReminder&#39;, false);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-onCancelClick'>    /**
+</span>     * The handler for the cancel button.
+     */
+    onCancelClick: function() {
+        var me = this;
+        var vm = me.getViewModel();
+        vm.set(&#39;featuresWithModifiedGeometries&#39;, []);
+        vm.set(&#39;featuresWithRemovedGeometries&#39;, []);
+        vm.set(&#39;newFeaturesAdded&#39;, false);
+        me.finishEditing();
+        me.completeTableEditing();
+        me.removeEditLayer();
+        me.createEditLayer();
+        me.addEditLayerToMap();
+        me.hideEditLayer();
+        me.removeEditToolbar();
+        me.createEditToolbar();
+        this.setLayerStore();
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-onReloadClick'>    onReloadClick: function() {
+</span>        var me = this;
+        me.fireEvent(&#39;reloadgrid&#39;);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-onEditButtonClick'>    /**
+</span>     * Handler for the editing buttons.
+     * @param {Ext.button.Button} btn The clicked button.
+     */
+    onEditButtonClick: function(btn) {
+        var me = this;
+        if (btn.pressed) {
+            me.showEditLayer();
+        } else {
+            me.hideEditLayer();
+        }
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-resetAllButtons'>    /**
+</span>     * Resets all buttons to a their initial state.
+     */
+    resetAllButtons: function() {
+        var me = this;
+        me.down(&#39;basigx-button-digitize-delete-object&#39;).setPressed(false);
+        me.down(&#39;basigx-button-digitize-modify-object&#39;).setPressed(false);
+        me.down(&#39;basigx-button-digitize-point&#39;).setPressed(false);
+        me.down(&#39;basigx-button-digitize-line&#39;).setPressed(false);
+        me.down(&#39;basigx-button-digitize-polygon&#39;).setPressed(false);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-createEditToolbar'>    /**
+</span>     * Create the edit toolbar.
+     */
+    createEditToolbar: function() {
+        var me = this;
+
+        var editTools = {
+            xtype: &#39;buttongroup&#39;,
+            height: this.getGridToolbarHeight(),
+            tbar: [{
+                xtype: &#39;button&#39;,
+                name: &#39;featuregrid-reload-btn&#39;,
+                bind: {
+                    text: &#39;{reloadButton}&#39;,
+                    disabled: &#39;{isEditing}&#39;
+                },
+                handler: me.onReloadClick.bind(me)
+            }, &#39; &#39;]
+        };
+
+        if (me.enableEditing) {
+            var vm = me.getViewModel();
+            var map = BasiGX.util.Map.getMapComponent().map;
+            var collection = this.editLayer.getSource().getFeaturesCollection();
+            var containsPoint = Ext.Array.contains(this.geometryTypes, &#39;Point&#39;);
+            var containsMultiPoint = Ext.Array.contains(
+                this.geometryTypes, &#39;MultiPoint&#39;);
+            var containsLine = Ext.Array.contains(this.geometryTypes,
+                &#39;LineString&#39;);
+            var containsMultiLine = Ext.Array.contains(
+                this.geometryTypes, &#39;MultiLineString&#39;);
+            var containsPolygon = Ext.Array.contains(this.geometryTypes,
+                &#39;Polygon&#39;);
+            var containsMultiPolygon = Ext.Array.contains(
+                this.geometryTypes, &#39;MultiPolygon&#39;);
+
+            var pointTool = {
+                xtype: &#39;basigx-button-digitize-point&#39;,
+                map: map,
+                layer: me.editLayer,
+                glyph: &#39;xf100@Flaticon&#39;,
+                handler: me.onEditButtonClick.bind(me),
+                multi: false,
+                viewModel: {
+                    data: {
+                        tooltip: vm.get(&#39;addPointButton&#39;),
+                        digitizePointText: &#39;&#39;
+                    }
+                }
+            };
+            if (!containsPoint &amp;&amp; !containsMultiPoint) {
+                pointTool.disabled = true;
+            }
+            if (containsMultiPoint) {
+                pointTool.multi = true;
+            }
+            editTools.tbar.push(pointTool);
+
+            var lineTool = {
+                xtype: &#39;basigx-button-digitize-line&#39;,
+                map: map,
+                layer: me.editLayer,
+                glyph: &#39;xf104@Flaticon&#39;,
+                multi: false,
+                handler: me.onEditButtonClick.bind(me),
+                viewModel: {
+                    data: {
+                        tooltip: vm.get(&#39;addLineButton&#39;),
+                        digitizeLineText: &#39;&#39;
+                    }
+                }
+            };
+            if (!containsLine &amp;&amp; !containsMultiLine) {
+                lineTool.disabled = true;
+            }
+            if (containsMultiLine) {
+                lineTool.multi = true;
+            }
+            editTools.tbar.push(lineTool);
+
+            var polygonTool = {
+                xtype: &#39;basigx-button-digitize-polygon&#39;,
+                map: map,
+                layer: me.editLayer,
+                glyph: &#39;xf107@Flaticon&#39;,
+                multi: false,
+                handler: me.onEditButtonClick.bind(me),
+                viewModel: {
+                    data: {
+                        digitizePolygonText: &#39;&#39;,
+                        tooltip: vm.get(&#39;addPolygonButton&#39;)
+                    }
+                }
+            };
+            if (!containsPolygon &amp;&amp; !containsMultiPolygon) {
+                polygonTool.disabled = true;
+            }
+            if (containsMultiPolygon) {
+                polygonTool.multi = true;
+            }
+            editTools.tbar.push(polygonTool);
+
+            editTools.tbar.push({
+                xtype: &#39;basigx-button-digitize-delete-object&#39;,
+                map: map,
+                collection: collection,
+                glyph: &#39;xf12d@FontAwesome&#39;,
+                handler: me.onEditButtonClick.bind(me),
+                viewModel: {
+                    data: {
+                        deleteObjectBtnText: &#39;&#39;,
+                        tooltip: vm.get(&#39;removeGeometryButton&#39;)
+                    }
+                }
+            });
+            editTools.tbar.push({
+                xtype: &#39;basigx-button-digitize-move-object&#39;,
+                collection: collection,
+                map: map,
+                glyph: &#39;xf108@Flaticon&#39;,
+                handler: me.onEditButtonClick.bind(me),
+                viewModel: {
+                    data: {
+                        moveObjectBtnText: &#39;&#39;,
+                        tooltip: vm.get(&#39;moveGeometryButton&#39;)
+                    }
+                },
+                listeners: {
+                    featurechanged: function(evt) {
+                        var feature = evt.features.getArray()[0];
+                        me.onChangeFeature(feature);
+                    }
+                }
+            });
+            editTools.tbar.push({
+                xtype: &#39;basigx-button-digitize-modify-object&#39;,
+                map: map,
+                collection: collection,
+                glyph: &#39;xf044@FontAwesome&#39;,
+                handler: me.onEditButtonClick.bind(me),
+                viewModel: {
+                    data: {
+                        modifyObjectBtnText: &#39;&#39;,
+                        tooltip: vm.get(&#39;editGeometryButton&#39;)
+                    }
+                },
+                listeners: {
+                    featurechanged: function(evt) {
+                        var feature = evt.features.getArray()[0];
+                        me.onChangeFeature(feature);
+                    }
+                }
+            });
+            editTools.tbar.push(&#39; &#39;);
+            editTools.tbar.push({
+                xtype: &#39;button&#39;,
+                name: &#39;featuregrid-cancel-btn&#39;,
+                bind: {
+                    text: &#39;{cancelButton}&#39;,
+                    disabled: &#39;{!isEditing}&#39;
+                },
+                handler: me.onCancelClick.bind(me)
+            });
+            editTools.tbar.push({
+                xtype: &#39;button&#39;,
+                name: &#39;featuregrid-save-btn&#39;,
+                bind: {
+                    text: &#39;{saveButton}&#39;,
+                    disabled: &#39;{!isEditing}&#39;
+                },
+                handler: me.onSaveClick.bind(me)
+            });
+            var saveReminderText = vm.get(&#39;saveReminderText&#39;);
+            var delay = me.getSaveReminderDelay();
+            var delayInMinutes = Math.floor(delay / 1000 / 60);
+
+            saveReminderText = Ext.String.format(saveReminderText,
+                delayInMinutes);
+            editTools.tbar.push({
+                xtype: &#39;component&#39;,
+                bind: {
+                    hidden: &#39;{!showSaveReminder}&#39;,
+                    html: &#39;&lt;b style=&quot;color: red;&quot;&gt;&#39; + saveReminderText + &#39;&lt;/b&gt;&#39;
+                }
+            });
+        }
+        me.insert(0, editTools);
+    },
+
+<span id='BasiGX-view-grid-FeatureGrid-method-removeEditToolbar'>    /**
+</span>     * Remove the edit toolbar.
+     */
+    removeEditToolbar: function() {
+        var me = this;
+        var editToolbar = me.down(&#39;buttongroup&#39;);
+        me.remove(editToolbar);
     }
 
 });

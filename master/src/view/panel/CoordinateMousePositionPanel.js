@@ -36,7 +36,8 @@ Ext.define('BasiGX.view.panel.CoordinateMousePositionPanel', {
         'Ext.button.Segmented',
 
         'BasiGX.view.component.Map',
-        'BasiGX.util.Projection'
+        'BasiGX.util.Projection',
+        'BasiGX.util.Layer'
     ],
 
     /**
@@ -84,6 +85,22 @@ Ext.define('BasiGX.view.panel.CoordinateMousePositionPanel', {
     olMap: null,
 
     /**
+     * The layer for the marker
+     */
+    markerLayer: null,
+
+    /**
+     * True, if marker should be shown at coordinate.
+     * False otherwise.
+     */
+    showMarker: false,
+
+    /**
+     * Optional style for the marker.
+     */
+    markerStyle: null,
+
+    /**
      * The OpenLayers MousePosition control
      */
     olMousePositionControl: null,
@@ -121,6 +138,29 @@ Ext.define('BasiGX.view.panel.CoordinateMousePositionPanel', {
      * @type {Boolean}
      */
     updateTextfields: true,
+
+    listeners: {
+        /**
+         * Removes the marker from the map.
+         */
+        'removeMarker': function() {
+            var me = this;
+            if (me.markerLayer) {
+                me.markerLayer.getSource().clear();
+            }
+
+        },
+        /**
+         * Checks if given feature is our map marker.
+         * @param {ol.Feature} feat The feature to check.
+         * @return {boolean} True, if feature is our map marker.
+         * False otherwise.
+         */
+        'isMapMarker': function(feat) {
+            var me = this;
+            return me.isMapMarker(feat);
+        }
+    },
 
     /**
      * The initialization function
@@ -238,7 +278,7 @@ Ext.define('BasiGX.view.panel.CoordinateMousePositionPanel', {
      * Generate UI depending on number of passed EPSG codes
      *
      * @param {Object[]} proj4jObjects An array of objects returned by
-     *        http://epsg.io which includes information on projection, in
+     *        https://epsg.io which includes information on projection, in
      *        particular the name, the unit and the proj4 definition
      */
     generateCrsChangeButtonGroup: function(proj4jObjects) {
@@ -299,10 +339,11 @@ Ext.define('BasiGX.view.panel.CoordinateMousePositionPanel', {
                 var mapCode = me.olMap.getView().getProjection().getCode()
                     .split(':')[1];
                 var filtered = Ext.Array.filter(proj4jObjects, function(obj) {
-                    return obj.code === mapCode;
+                    // Loose equality check since code could be a string or an int
+                    return obj.code == mapCode;
                 });
                 me.getViewModel().setData({
-                    srsName: filtered ? filtered[0].name : ''
+                    srsName: !Ext.isEmpty(filtered) ? filtered[0].name : ''
                 });
             }
         }
@@ -455,7 +496,58 @@ Ext.define('BasiGX.view.panel.CoordinateMousePositionPanel', {
             me.olMousePositionControl.getProjection(),
             me.olMap.getView().getProjection()
         );
+        if (me.showMarker) {
+            me.showMarkerOnMap(targetCenter);
+        }
         me.olMap.getView().setCenter(targetCenter);
+    },
+
+    /**
+     * Places a marker on the map.
+     *
+     * @param {[number, number]} position The position for the marker.
+     */
+    showMarkerOnMap: function(position) {
+        var me = this;
+        if (!me.markerLayer) {
+            var source = new ol.source.Vector();
+            var style = undefined;
+            if (me.markerStyle) {
+                style = me.markerStyle;
+            }
+            me.markerLayer = new ol.layer.Vector({
+                source: source,
+                style: style
+            });
+            var LayerUtil = BasiGX.util.Layer;
+            var showInLayerSwitcherKey = LayerUtil.KEY_DISPLAY_IN_LAYERSWITCHER;
+            me.markerLayer.set(showInLayerSwitcherKey, false);
+            me.olMap.addLayer(me.markerLayer);
+        }
+        var markerSource = me.markerLayer.getSource();
+        var feature = new ol.Feature({
+            geometry: new ol.geom.Point(position)
+        });
+        markerSource.clear();
+        markerSource.addFeature(feature);
+    },
+
+    /**
+     * Checks if a given feature is our map marker.
+     *
+     * @param {ol.Feature} feat The feature to check.
+     * @return {boolean} True, if feature is our map marker. False otherwise.
+     */
+    isMapMarker: function(feat) {
+        var me = this;
+        if (!me.markerLayer) {
+            return false;
+        }
+        var source = me.markerLayer.getSource();
+        if (!source) {
+            return false;
+        }
+        return source.getFeatures()[0] === feat;
     }
 
 });

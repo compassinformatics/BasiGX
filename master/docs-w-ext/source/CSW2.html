@@ -58,7 +58,7 @@ Ext.define(&#39;BasiGX.view.form.CSW&#39;, {
         &#39;BasiGX.view.form.AddWms&#39;
     ],
 
-<span id='BasiGX-view-form-CSW-property-viewModel'>    viewModel: {
+<span id='BasiGX-view-form-CSW-cfg-viewModel'>    viewModel: {
 </span>        data: {
             queryParamsFieldSetTitle: &#39;CSW Basis URL&#39;,
             availableLayesFieldSetTitle: &#39;Verfügbare CSW Dienste&#39;,
@@ -94,13 +94,13 @@ Ext.define(&#39;BasiGX.view.form.CSW&#39;, {
         }
     },
 
-<span id='BasiGX-view-form-CSW-property-padding'>    padding: 5,
-</span><span id='BasiGX-view-form-CSW-property-layout'>    layout: &#39;anchor&#39;,
-</span><span id='BasiGX-view-form-CSW-property-defaults'>    defaults: {
+<span id='BasiGX-view-form-CSW-cfg-padding'>    padding: 5,
+</span><span id='BasiGX-view-form-CSW-cfg-layout'>    layout: &#39;anchor&#39;,
+</span><span id='BasiGX-view-form-CSW-cfg-defaults'>    defaults: {
 </span>        anchor: &#39;100%&#39;
     },
 
-<span id='BasiGX-view-form-CSW-property-scrollable'>    scrollable: true,
+<span id='BasiGX-view-form-CSW-cfg-scrollable'>    scrollable: true,
 </span>
 
     config: {
@@ -147,7 +147,14 @@ Ext.define(&#39;BasiGX.view.form.CSW&#39;, {
              * @type {Boolean}
              */
             disableCaching: true
-        }
+        },
+
+<span id='BasiGX-view-form-CSW-cfg-ajaxProxy'>        /**
+</span>         * Optional AJAX proxy URL, which will be added before the &#39;real&#39;
+         * target CSW URL, e.g. &#39;../my-proxy.action?baseUrl=&#39;
+         * @cfg {String}
+         */
+        ajaxProxy: null
     },
 
 <span id='BasiGX-view-form-CSW-property-lastErrorMsgKey'>    /**
@@ -226,9 +233,9 @@ Ext.define(&#39;BasiGX.view.form.CSW&#39;, {
                         var view = textfield.up(&#39;basigx-form-csw&#39;);
                         view.resetState();
                     },
-                    specialkey: function (textfield, evt) {
+                    specialkey: function(textfield, evt) {
                         // execute search on ENTER is hit inside the textfield
-                        if(evt.getKey() === evt.ENTER){
+                        if (evt.getKey() === evt.ENTER) {
                             evt.preventDefault();
                             var view = textfield.up(&#39;basigx-form-csw&#39;);
                             view.resetState();
@@ -255,7 +262,7 @@ Ext.define(&#39;BasiGX.view.form.CSW&#39;, {
         }
     ],
 
-<span id='BasiGX-view-form-CSW-property-buttons'>    // Reset and Submit buttons
+<span id='BasiGX-view-form-CSW-cfg-buttons'>    // Reset and Submit buttons
 </span>    buttons: [
         {
             name: &#39;resetFormBtn&#39;,
@@ -378,6 +385,11 @@ Ext.define(&#39;BasiGX.view.form.CSW&#39;, {
             url = values.cswUrl;
         } else {
             url = values.cswUrlCombo;
+        }
+
+        // add optional AJAX proxy URL
+        if (!Ext.isEmpty(me.ajaxProxy)) {
+            url = me.ajaxProxy + url;
         }
 
         var postBody =

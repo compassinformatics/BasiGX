@@ -31,7 +31,7 @@ Ext.define('BasiGX.view.form.Print', {
 
         'BasiGX.util.Layer',
         'BasiGX.util.Map',
-        'BasiGX.ol3.extension.TransformInteraction',
+        'BasiGX.olExt.TransformInteraction',
 
         'GeoExt.data.MapfishPrintProvider'
     ],
@@ -80,12 +80,14 @@ Ext.define('BasiGX.view.form.Print', {
         printExtentMovable: false,
         printExtentScalable: false,
         printExtentRotatable: false,
+        alwaysKeepAspectRatio: false,
         /**
          * Option to be able to print without a map.
          * @type {Boolean} if true, app selection and the extent rectangle are
          * disabled.
          */
-        skipMapMode: false
+        skipMapMode: false,
+        useJsonp: true
     },
 
     borderColors: [
@@ -199,6 +201,16 @@ Ext.define('BasiGX.view.form.Print', {
         resize: 'renderAllClientInfos'
     },
 
+
+    /**
+     *
+     */
+    constructor: function() {
+        var me = this;
+        me.renderAllClientInfos = me.renderAllClientInfos.bind(this);
+        me.callParent(arguments);
+    },
+
     /**
      * Initializes the print form.
      */
@@ -241,13 +253,21 @@ Ext.define('BasiGX.view.form.Print', {
      */
     createAppsStore: function() {
         var me = this;
+        var proxy = {
+            type: 'ajax',
+            url: me.getUrl() + 'apps.json'
+        };
+        if (this.getUseJsonp()) {
+            proxy.type = 'jsonp';
+            proxy.callbackKey = 'jsonp';
+        } else {
+            proxy.reader = {
+                type: 'json'
+            };
+        }
         var remoteAppsStore = Ext.create('Ext.data.Store', {
             autoLoad: true,
-            proxy: {
-                type: 'jsonp',
-                url: me.getUrl() + 'apps.json',
-                callbackKey: 'jsonp'
-            },
+            proxy: proxy,
             listeners: {
                 // The real work is done in the callback below, make sure
                 // to read the docs there
@@ -438,7 +458,7 @@ Ext.define('BasiGX.view.form.Print', {
         //          cleanupPrintExtent method, but tzhat may currently
         //          be called to often.
         var existingLayer = null;
-        var isPrintExtentLayerKey = this.self.LAYER_IDENTIFIER_KEY;
+        var isPrintExtentLayerKey = BasiGX.view.form.Print.LAYER_IDENTIFIER_KEY;
         targetMap.getLayers().forEach(function(maplayer) {
             if (maplayer.get(isPrintExtentLayerKey) === true) {
                 existingLayer = maplayer;
@@ -459,7 +479,6 @@ Ext.define('BasiGX.view.form.Print', {
         var displayInLayerSwitcherKey = BasiGX.util.Layer
             .KEY_DISPLAY_IN_LAYERSWITCHER;
         layer.set(displayInLayerSwitcherKey, false);
-
         targetMap.addLayer(layer);
         this.extentLayer = layer;
     },
@@ -483,6 +502,9 @@ Ext.define('BasiGX.view.form.Print', {
         me.transformInteraction = new ol.interaction.Transform({
             layers: [extentLayer],
             fixedScaleRatio: true,
+            keepAspectRatio: me.getAlwaysKeepAspectRatio() ?
+                ol.events.condition.always :
+                ol.events.condition.shiftKeyOnly,
             translate: me.getPrintExtentMovable(),
             scale: me.getPrintExtentScalable(),
             stretch: me.getPrintExtentScalable(),
@@ -523,7 +545,7 @@ Ext.define('BasiGX.view.form.Print', {
         ) !== false); // may be undefined for certain layers
 
         if (isChecked && hasName && nonOpaque && inTree) {
-            if (layer instanceof ol.layer.Vector &&
+            if (layer instanceof ol.layer.BaseVector &&
                 layer.getSource().getFeatures().length < 1) {
                 return false;
             }
@@ -593,7 +615,8 @@ Ext.define('BasiGX.view.form.Print', {
                 ready: 'onPrintProviderReady',
                 error: 'onPrintProviderError',
                 scope: this
-            }
+            },
+            useJsonp: this.getUseJsonp()
         });
     },
 
@@ -894,7 +917,7 @@ Ext.define('BasiGX.view.form.Print', {
             case 'MapAttributeValues':
                 attributeFields = me.getMapAttributeFields(attributeRec);
                 if (me.getPrintExtentAlwaysCentered()) {
-                    map.on('moveend', me.renderAllClientInfos, me);
+                    map.on('moveend', me.renderAllClientInfos);
                 }
                 break;
             case 'NorthArrowAttributeValues':
@@ -996,7 +1019,7 @@ Ext.define('BasiGX.view.form.Print', {
         if (this.extentLayer) {
             me.extentLayer.getSource().clear();
         }
-        map.un('moveend', me.renderAllClientInfos, me);
+        map.un('moveend', me.renderAllClientInfos);
     },
 
     /**

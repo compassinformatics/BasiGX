@@ -114,6 +114,9 @@ Ext.define(&#39;BasiGX.view.panel.LegendTree&#39;, {
     initComponent: function() {
         var me = this;
 
+        this.addListener(&#39;collapse&#39;, this.onCollapse.bind(this));
+        this.addListener(&#39;expand&#39;, this.onExpand.bind(this));
+
         // The following fix is needed for ExtJS versions between 6.0.0 and
         // 6.2.0 only. We keep it for backwards compatibility.
         if (me.isExtVersionLowerThan62()) {
@@ -165,7 +168,6 @@ Ext.define(&#39;BasiGX.view.panel.LegendTree&#39;, {
             alt: &#39;{{record.getOlLayer().get(&quot;legendUrl&quot;)}}&#39;
         }]
     },
-
 <span id='BasiGX-view-panel-LegendTree-method-setModeAllBodies'>    /**
 </span>     * Expands, collapses or toggles all row bodies with the components,
      * depending on the passed mode.
@@ -248,7 +250,16 @@ Ext.define(&#39;BasiGX.view.panel.LegendTree&#39;, {
      */
     getColorFromRow: function(rec) {
         var me = this;
-        var color = rec.getData().get(&#39;treeColor&#39;);
+        var recData = rec.getData();
+        var color;
+        if (Ext.isFunction(recData.get)) {
+            color = recData.get(&#39;treeColor&#39;);
+        } else if (recData.treeColor) {
+            color = recData.treeColor;
+        } else if (Ext.isFunction(rec.getOlLayer) &amp;&amp;
+            Ext.isFunction(rec.getOlLayer().get)) {
+            color = rec.getOlLayer().get(&#39;treeColor&#39;);
+        }
 
         // detect if we have a folder and apply color from childNode
         if (!Ext.isDefined(color) &amp;&amp;
@@ -274,7 +285,6 @@ Ext.define(&#39;BasiGX.view.panel.LegendTree&#39;, {
      * @return {String} A CSS class to use.
      */
     getCssForRow: function(rec) {
-
         var color = this.getColorFromRow(rec);
 
         // if color is still not defined, return old default
@@ -317,6 +327,23 @@ Ext.define(&#39;BasiGX.view.panel.LegendTree&#39;, {
      */
     isExtVersionLowerThan62: function() {
         return parseInt(Ext.getVersion().getShortVersion(), 10) &lt; 620000;
+    },
+<span id='BasiGX-view-panel-LegendTree-method-onCollapse'>    /**
+</span>     * The handler for the beforedestroy event.
+     */
+    onCollapse: function() {
+        window.setTimeout(function () {
+            // Update the map size when collapsing the legendTree
+            var map = BasiGX.util.Map.getMapComponent().map;
+            map.updateSize();
+        }, 100);
+    },
+<span id='BasiGX-view-panel-LegendTree-method-onExpand'>    onExpand: function() {
+</span>        window.setTimeout(function () {
+            // Update the map size when expanding the legendTree
+            var map = BasiGX.util.Map.getMapComponent().map;
+            map.updateSize();
+        }, 100);
     }
 });
 </pre>

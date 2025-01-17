@@ -57,7 +57,7 @@ Ext.define(&#39;BasiGX.view.container.MultiSearchSettings&#39;, {
         &#39;Ext.Button&#39;
     ],
 
-<span id='BasiGX-view-container-MultiSearchSettings-property-viewModel'>    viewModel: {
+<span id='BasiGX-view-container-MultiSearchSettings-cfg-viewModel'>    viewModel: {
 </span>        data: {
             generalSettingsLabel: &#39;Allgemeine Einstellungen&#39;,
             limitCboxLabel: &#39;Auf den sichtbaren Kartenbereich einschränken&#39;,
@@ -73,18 +73,21 @@ Ext.define(&#39;BasiGX.view.container.MultiSearchSettings&#39;, {
         }
     },
 
-<span id='BasiGX-view-container-MultiSearchSettings-property-autoScroll'>    autoScroll: true,
+<span id='BasiGX-view-container-MultiSearchSettings-cfg-autoScroll'>    autoScroll: true,
 </span>
 <span id='BasiGX-view-container-MultiSearchSettings-property-constrainHeader'>    constrainHeader: true,
 </span>
-<span id='BasiGX-view-container-MultiSearchSettings-property-padding'>    padding: 20,
-</span>
-<span id='BasiGX-view-container-MultiSearchSettings-property-width'>    width: 500,
+<span id='BasiGX-view-container-MultiSearchSettings-cfg-padding'>    padding: 20,
 </span>
     config: {
-<span id='BasiGX-view-container-MultiSearchSettings-cfg-combo'>        combo: null
+<span id='BasiGX-view-container-MultiSearchSettings-cfg-combo'>        combo: null,
+</span><span id='BasiGX-view-container-MultiSearchSettings-cfg-limitToExtent'>        limitToExtent: true,
+</span><span id='BasiGX-view-container-MultiSearchSettings-cfg-useGazetteerSearch'>        useGazetteerSearch: true,
+</span><span id='BasiGX-view-container-MultiSearchSettings-cfg-useObjectSearch'>        useObjectSearch: true
 </span>    },
 
+<span id='BasiGX-view-container-MultiSearchSettings-cfg-layout'>    layout: &#39;fit&#39;,
+</span>
 <span id='BasiGX-view-container-MultiSearchSettings-property-items'>    items: [{
 </span>        xtype: &#39;form&#39;,
         width: &#39;100%&#39;,
@@ -98,27 +101,24 @@ Ext.define(&#39;BasiGX.view.container.MultiSearchSettings&#39;, {
                 fieldLabel: &#39;{generalSettingsLabel}&#39;
             },
             defaults: {
-                xtype: &#39;checkboxfield&#39;,
-                checked: true
+                xtype: &#39;checkboxfield&#39;
             },
-            items: [
-                {
-                    bind: {
-                        boxLabel: &#39;{limitCboxLabel}&#39;
-                    },
-                    name: &#39;limitcheckbox&#39;
-                }, {
-                    bind: {
-                        boxLabel: &#39;{gazetteerLabel}&#39;
-                    },
-                    name: &#39;gazetteersearch&#39;
-                }, {
-                    bind: {
-                        boxLabel: &#39;{objectSearchLabel}&#39;
-                    },
-                    name: &#39;objectsearch&#39;
-                }
-            ]
+            items: [{
+                bind: {
+                    boxLabel: &#39;{limitCboxLabel}&#39;
+                },
+                name: &#39;limitcheckbox&#39;
+            }, {
+                bind: {
+                    boxLabel: &#39;{gazetteerLabel}&#39;
+                },
+                name: &#39;gazetteersearch&#39;
+            }, {
+                bind: {
+                    boxLabel: &#39;{objectSearchLabel}&#39;
+                },
+                name: &#39;objectsearch&#39;
+            }]
         }, {
             xtype: &#39;fieldcontainer&#39;,
             name: &#39;resultcount&#39;,
@@ -134,21 +134,28 @@ Ext.define(&#39;BasiGX.view.container.MultiSearchSettings&#39;, {
         }, {
             xtype: &#39;fieldcontainer&#39;,
             name: &#39;objectlayers&#39;,
+            maxHeight: 200,
+            scrollable: &#39;y&#39;,
             bind: {
                 fieldLabel: &#39;{objectSearchLayersLabel}&#39;
             },
             defaultType: &#39;checkboxfield&#39;
+        }],
+        dockedItems: [{
+            xtype: &#39;toolbar&#39;,
+            dock: &#39;bottom&#39;,
+            items: [{
+                xtype: &#39;button&#39;,
+                bind: {
+                    text: &#39;{saveBtnText}&#39;
+                },
+                formBind: true,
+                handler: function(btn) {
+                    var multisearchSettingsContainer = this.up(&#39;form&#39;).up();
+                    multisearchSettingsContainer.saveSettings(btn);
+                }
+            }]
         }]
-    }, {
-        xtype: &#39;button&#39;,
-        bind: {
-            text: &#39;{saveBtnText}&#39;
-        },
-        formBind: true,
-        handler: function(btn) {
-            var multisearchSettingsContainer = this.up();
-            multisearchSettingsContainer.saveSettings(btn);
-        }
     }],
 
 <span id='BasiGX-view-container-MultiSearchSettings-method-initComponent'>    /**
@@ -159,11 +166,18 @@ Ext.define(&#39;BasiGX.view.container.MultiSearchSettings&#39;, {
 
         me.callParent();
 
-        if (me.combo) {
-            me.setCombo(me.combo);
+        if (me.getCombo()) {
+            me.setCombo(me.getCombo());
             me.down(&#39;numberfield[name=maxfeatures]&#39;)
                 .setValue(me.getCombo().getMaxFeatures());
         }
+
+        me.down(&#39;checkbox[name=limitcheckbox]&#39;)
+            .setValue(me.getLimitToExtent());
+        me.down(&#39;checkbox[name=gazetteersearch]&#39;)
+            .setValue(me.getUseGazetteerSearch());
+        me.down(&#39;checkbox[name=objectsearch]&#39;)
+            .setValue(me.getUseObjectSearch());
 
         me.on(&#39;beforerender&#39;, me.addLayers);
 
@@ -197,7 +211,8 @@ Ext.define(&#39;BasiGX.view.container.MultiSearchSettings&#39;, {
      * @param {Ext.button.Button} btn The &quot;save&quot;-button.
      */
     saveSettings: function(btn) {
-        var settingsContainer = btn.up();
+
+        var settingsContainer = btn.up(&#39;form&#39;).up();
 
         var win = settingsContainer.up();
 

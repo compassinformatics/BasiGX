@@ -147,7 +147,14 @@ Ext.define(&#39;BasiGX.view.form.CSW&#39;, {
              * @type {Boolean}
              */
             disableCaching: true
-        }
+        },
+
+<span id='BasiGX-view-form-CSW-cfg-ajaxProxy'>        /**
+</span>         * Optional AJAX proxy URL, which will be added before the &#39;real&#39;
+         * target CSW URL, e.g. &#39;../my-proxy.action?baseUrl=&#39;
+         * @cfg {String}
+         */
+        ajaxProxy: null
     },
 
 <span id='BasiGX-view-form-CSW-property-lastErrorMsgKey'>    /**
@@ -226,9 +233,9 @@ Ext.define(&#39;BasiGX.view.form.CSW&#39;, {
                         var view = textfield.up(&#39;basigx-form-csw&#39;);
                         view.resetState();
                     },
-                    specialkey: function (textfield, evt) {
+                    specialkey: function(textfield, evt) {
                         // execute search on ENTER is hit inside the textfield
-                        if(evt.getKey() === evt.ENTER){
+                        if (evt.getKey() === evt.ENTER) {
                             evt.preventDefault();
                             var view = textfield.up(&#39;basigx-form-csw&#39;);
                             view.resetState();
@@ -378,6 +385,11 @@ Ext.define(&#39;BasiGX.view.form.CSW&#39;, {
             url = values.cswUrl;
         } else {
             url = values.cswUrlCombo;
+        }
+
+        // add optional AJAX proxy URL
+        if (!Ext.isEmpty(me.ajaxProxy)) {
+            url = me.ajaxProxy + url;
         }
 
         var postBody =

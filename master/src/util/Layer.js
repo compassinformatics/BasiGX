@@ -44,6 +44,18 @@ Ext.define('BasiGX.util.Layer', {
         NAME_MEASURE_LAYER: 'basigx-measure-layer',
 
         /**
+         * The name of a layer used for the geolocation. Can be used to
+         * dynamically determine that particular layer.
+         */
+        NAME_GEOLOCATION_LAYER: 'basigx-geolocation-layer',
+
+        /**
+         * The name of a layer used for the animation. Can be used to
+         * dynamically determine that particular layer.
+         */
+        NAME_ANIMATION_LAYER: 'basigx-animation-layer',
+
+        /**
          * Get an ol-layer by the given key-value constellation.
          *
          * @param {String} key - the layer's property name
@@ -68,8 +80,7 @@ Ext.define('BasiGX.util.Layer', {
                 if (matchingLayer) {
                     return false;
                 }
-                if (layer.get(key) === val &&
-                    layer instanceof ol.layer.Base) {
+                if (layer.get(key) === val && layer instanceof ol.layer.Base) {
                     matchingLayer = layer;
                     return false;
                 } else if (layer instanceof ol.layer.Group) {
@@ -262,6 +273,38 @@ Ext.define('BasiGX.util.Layer', {
             });
 
             return visibleLayers;
+        },
+
+        /**
+         * Cascades down a given LayerGroup, calling the given function for
+         * each LayerGroup / Layer.
+         *
+         * @param  {ol.layer.Group} lyrGroup The layer group to cascade down
+         * @param  {Function} fn A function to call on every LayerGroup / Layer
+         * @return {void}
+         */
+        cascadeLayers: function(lyrGroup, fn) {
+            if (!(lyrGroup instanceof ol.layer.Group)) {
+                // skip on wrong input type
+                Ext.Logger.warn(
+                    'No ol.layer.Group given to ' +
+                    'BasiGX.util.Layer.cascadeLayers. It is unlikely that ' +
+                    'this will work properly. Skipping!');
+                return;
+            }
+            if(!Ext.isFunction(fn)){
+                Ext.Logger.warn(
+                    'No function passed ' +
+                    'this will not work. Skipping!');
+                return;
+            }
+
+            lyrGroup.getLayers().forEach(function(layerOrGroup) {
+                fn(layerOrGroup);
+                if (layerOrGroup instanceof ol.layer.Group) {
+                    BasiGX.util.Layer.cascadeLayers(layerOrGroup, fn);
+                }
+            });
         }
     }
 });

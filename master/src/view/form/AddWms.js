@@ -198,6 +198,8 @@ Ext.define('BasiGX.view.form.AddWms', {
      */
     triedVersions: [],
 
+    defaultButton: 'requestLayersBtn',
+
     items: [
         {
             xtype: 'fieldset',
@@ -226,6 +228,7 @@ Ext.define('BasiGX.view.form.AddWms', {
                         var countUrls = view.wmsBaseUrls.length;
                         if (countUrls !== 0) {
                             textfield.setHidden(true);
+                            textfield.allowBlank = true;
                         }
                     }
                 }
@@ -248,6 +251,7 @@ Ext.define('BasiGX.view.form.AddWms', {
                         var countUrls = view.wmsBaseUrls.length;
                         if (countUrls === 0) {
                             combobox.setHidden(true);
+                            combobox.allowBlank = true;
                         } else {
                             var urlWms = view.wmsBaseUrls;
                             combobox.setStore(urlWms);
@@ -291,7 +295,7 @@ Ext.define('BasiGX.view.form.AddWms', {
             xtype: 'fieldset',
             name: 'fs-available-layers',
             layout: 'anchor',
-            scrollable: 'y',
+            scrollable: true,
             maxHeight: 200,
             defaults: {
                 anchor: '100%'
@@ -341,6 +345,7 @@ Ext.define('BasiGX.view.form.AddWms', {
                 text: '{requestLayersBtnText}'
             },
             name: 'requestLayersBtn',
+            reference: 'requestLayersBtn',
             formBind: true, // only enabled once the form is valid
             disabled: true,
             handler: function(btn) {
@@ -424,6 +429,7 @@ Ext.define('BasiGX.view.form.AddWms', {
             return;
         }
         me.setLoading(true);
+        me.uncheckAllLayers();
         me.removeAddLayersComponents();
         var values = form.getValues();
         var url = '';
@@ -717,14 +723,15 @@ Ext.define('BasiGX.view.form.AddWms', {
      * @param {String} version The WMS version.
      * @param {String} mapProj The map projection as string.
      * @param {String} url The WMS URL.
+     * @param {string[]} allCrs a list of all available coordinate systems
+     *  up to this level
      * @return {ol.layer.Tile} The created layer or `undefined`.
      */
-    getOlLayer: function(capLayer, version, mapProj, url) {
+    getOlLayer: function(capLayer, version, mapProj, url, allCrs) {
         // This really should not matter, as ol can reproject in the client
         // At least it should be configurable
         if (version === '1.3.0' &&
-            Ext.isArray(capLayer.CRS) &&
-            !Ext.Array.contains(capLayer.CRS, mapProj)) {
+            !Ext.Array.contains(allCrs, mapProj)) {
             // only available for 1.3.0
             return;
         }
@@ -749,23 +756,25 @@ Ext.define('BasiGX.view.form.AddWms', {
         }
 
         var bbox;
-        for (var i = 0; i < capLayer.BoundingBox.length; ++i) {
-            if (capLayer.BoundingBox[i].crs === 'CRS:84') {
-                bbox = capLayer.BoundingBox[i].extent;
-            }
-        }
-        if (!bbox) {
-            for (i = 0; i < capLayer.BoundingBox.length; ++i) {
-                if (capLayer.BoundingBox[i].crs === 'EPSG:4326') {
+        if (capLayer.BoundingBox) {
+            for (var i = 0; i < capLayer.BoundingBox.length; ++i) {
+                if (capLayer.BoundingBox[i].crs === 'CRS:84') {
                     bbox = capLayer.BoundingBox[i].extent;
                 }
             }
-        }
-        // looks like parsing 1.1.1 capabilities the crs is not
-        // set on the bounding box object
-        if (!bbox) {
-            for (i = 0; i < capLayer.BoundingBox.length; ++i) {
-                bbox = capLayer.BoundingBox[i].extent;
+            if (!bbox) {
+                for (i = 0; i < capLayer.BoundingBox.length; ++i) {
+                    if (capLayer.BoundingBox[i].crs === 'EPSG:4326') {
+                        bbox = capLayer.BoundingBox[i].extent;
+                    }
+                }
+            }
+            // looks like parsing 1.1.1 capabilities the crs is not
+            // set on the bounding box object
+            if (!bbox) {
+                for (i = 0; i < capLayer.BoundingBox.length; ++i) {
+                    bbox = capLayer.BoundingBox[i].extent;
+                }
             }
         }
 
@@ -781,11 +790,44 @@ Ext.define('BasiGX.view.form.AddWms', {
     },
 
     /**
+     * Recursively collect all available sub layers from
+     * the given capabilities layer node.
+     *
+     * @param {object} layer the capabilities layer node
+     * @param {string} version the WMS version
+     * @param {string} mapProj the projection
+     * @param {string} url the WMS URL
+     * @param {ol.Layer[]} compatible the array to collect the layers in
+     * @param {string[]} allCrs all coordinate systems found in the hierarchy
+     */
+    collectLayers: function(layer, version, mapProj, url, compatible, allCrs) {
+        var me = this;
+        allCrs = allCrs.concat(layer.CRS);
+        var olLayer = me.getOlLayer(layer, version, mapProj, url, allCrs);
+        if (olLayer) {
+            compatible.push(olLayer);
+        }
+
+        if (Ext.isArray(layer.Layer)) {
+            Ext.each(layer.Layer, function(subLayer) {
+                me.collectLayers(
+                    subLayer,
+                    version,
+                    mapProj,
+                    url,
+                    compatible,
+                    allCrs.slice()
+                );
+            });
+        }
+    },
+
+    /**
      * Checks if the passed capabilities object (from the #parser) is
-     * compatible. It woill return an array of layers if we could determine any,
+     * compatible. It will return an array of layers if we could determine any,
      * and the boolean value `false` if not.
      *
-     * @param {Object} capabilities The GetCapabbilties object as it is returned
+     * @param {Object} capabilities The GetCapabilities object as it is returned
      *     by our parser.
      * @return {ol.layer.Tile[]|boolean} Eitehr an array of comüatible layers or
      *     'false'.
@@ -804,6 +846,7 @@ Ext.define('BasiGX.view.form.AddWms', {
         var mapProj = map.getView().getProjection().getCode();
 
         // same in both versions
+        var allCrs = capabilities.Capability.Layer.CRS || [];
         var layers = capabilities.Capability.Layer.Layer;
         var url = capabilities.Capability.Request.GetMap.
             DCPType[0].HTTP.Get.OnlineResource;
@@ -811,19 +854,22 @@ Ext.define('BasiGX.view.form.AddWms', {
         var includeSubLayer = me.getIncludeSubLayer();
 
         Ext.each(layers, function(layer) {
-            var olLayer = me.getOlLayer(layer, version, mapProj, url);
+            var crsList = allCrs.concat(layer.CRS);
+            var olLayer = me.getOlLayer(layer, version, mapProj, url, crsList);
             if (olLayer) {
                 compatible.push(olLayer);
             }
 
             if (includeSubLayer && Ext.isArray(layer.Layer)) {
                 Ext.each(layer.Layer, function(subLayer) {
-                    var subOlLayer = me.getOlLayer(
-                        subLayer, version, mapProj, url
+                    me.collectLayers(
+                        subLayer,
+                        version,
+                        mapProj,
+                        url,
+                        compatible,
+                        crsList
                     );
-                    if (subOlLayer) {
-                        compatible.push(subOlLayer);
-                    }
                 });
             }
         });

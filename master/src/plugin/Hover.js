@@ -20,7 +20,8 @@ Ext.define('BasiGX.plugin.Hover', {
     extend: 'Ext.plugin.Abstract',
 
     requires: [
-        'BasiGX.util.StringTemplate'
+        'BasiGX.util.StringTemplate',
+        'BasiGX.util.Url'
     ],
 
     alias: 'plugin.hover',
@@ -91,7 +92,12 @@ Ext.define('BasiGX.plugin.Hover', {
          */
         mapPaddingPositioning: 30,
         maxHeight: null,
-        className: 'ol-overlay-container ol-selectable'
+        className: 'ol-overlay-container ol-selectable',
+        /**
+         * If true, renders urls as clickable links.
+         * If false, renders urls as plain strings.
+         */
+        enableClickableLinks: false
     },
 
     /**
@@ -175,7 +181,7 @@ Ext.define('BasiGX.plugin.Hover', {
         var mapComponent = me.getCmp();
         var map = mapComponent.getMap();
         // whenever the layergroup changes, we need to cleanup hover artifacts
-        map.on('change:layerGroup', me.cleanupHoverArtifacts, me);
+        map.on('change:layerGroup', me.cleanupHoverArtifacts.bind(me));
     },
 
     /**
@@ -194,9 +200,9 @@ Ext.define('BasiGX.plugin.Hover', {
             });
             if (me.selectEventOrigin === 'collection') {
                 var featureCollection = interaction.getFeatures();
-                featureCollection.on('add', me.onFeatureClicked, me);
+                featureCollection.on('add', me.onFeatureClicked.bind(me));
             } else {
-                interaction.on('select', me.onFeatureClicked, me);
+                interaction.on('select', me.onFeatureClicked.bind(me));
             }
             map.addInteraction(interaction);
             me.setHoverVectorLayerInteraction(interaction);
@@ -321,6 +327,7 @@ Ext.define('BasiGX.plugin.Hover', {
         var mapComponent = me.getCmp();
         var map = mapComponent.getMap();
         var mapView = map.getView();
+        var allLayers = map.getAllLayers();
         var pixel = evt.pixel;
         var hoverableProp = me.self.LAYER_HOVERABLE_PROPERTY_NAME;
         var hoverFeaturesRevertProp = me.self.LAYER_HOVER_FEATURES_REVERT_NAME;
@@ -329,7 +336,7 @@ Ext.define('BasiGX.plugin.Hover', {
 
         me.cleanupHoverArtifacts();
 
-        map.forEachLayerAtPixel(pixel, function(layer, pixelValues) {
+        var callback = function(layer, pixelValues) {
             var source = layer.getSource();
             var resolution = mapView.getResolution();
             var projCode = mapView.getProjection().getCode();
@@ -341,9 +348,9 @@ Ext.define('BasiGX.plugin.Hover', {
             // or has any other value than "false", the layer will be requested
             if (hoverable !== false) {
                 if (source instanceof ol.source.TileWMS
-                        || source instanceof ol.source.ImageWMS) {
+                    || source instanceof ol.source.ImageWMS) {
                     // me.cleanupHoverArtifacts();
-                    var url = source.getGetFeatureInfoUrl(
+                    var url = source.getFeatureInfoUrl(
                         evt.coordinate,
                         resolution,
                         projCode,
@@ -383,7 +390,7 @@ Ext.define('BasiGX.plugin.Hover', {
                     // VECTOR!
                     map.forEachFeatureAtPixel(pixel, function(feat) {
                         if (layer.get('type') === 'WFS' ||
-                                layer.get('type') === 'WFSCluster') {
+                            layer.get('type') === 'WFSCluster') {
                             var hvl = me.getHoverVectorLayer();
                             // TODO This should be dynamically generated
                             // from the clusterStyle
@@ -410,12 +417,24 @@ Ext.define('BasiGX.plugin.Hover', {
                         }
                         me.showHoverFeature(layer, hoverFeatures);
                         me.currentHoverTarget = feat;
-                    }, me, function(vectorCand) {
-                        return vectorCand === layer;
+                    }, {
+                        layerFilter: function(vectorCand) {
+                            return vectorCand === layer;
+                        }
                     });
                 }
             }
-        }, this, me.hoverLayerFilter, this);
+        };
+
+        allLayers.forEach(function(lyr) {
+            var layerData = lyr.getData(pixel);
+            if (layerData) {
+                var alphaValue = layerData.at(3);
+                if (alphaValue > 0 && me.hoverLayerFilter(lyr)) {
+                    callback(lyr, layerData);
+                }
+            }
+        });
 
         me.showHoverToolTip(evt, hoverLayers, hoverFeatures);
     },
@@ -428,7 +447,7 @@ Ext.define('BasiGX.plugin.Hover', {
         var me = this;
         var hoverableProp = me.self.LAYER_HOVERABLE_PROPERTY_NAME;
         if (candidate.get(hoverableProp) ||
-                candidate.get('type') === 'WFSCluster') {
+            candidate.get('type') === 'WFSCluster') {
             return true;
         } else {
             return false;
@@ -549,7 +568,7 @@ Ext.define('BasiGX.plugin.Hover', {
 
         // fallback positioning
         var positioning = ['top', 'left'];
-        var offset = [15, 0];
+        var offset = [20, 0];
 
         if (pixel[0] >= mapDims[0] - dimLeftRight) {
             // near the right
@@ -601,13 +620,17 @@ Ext.define('BasiGX.plugin.Hover', {
         var innerHtml = '';
         var hoverfieldProp = me.self.LAYER_HOVERFIELD_PROPERTY_NAME;
         var templateUtil = BasiGX.util.StringTemplate;
+        var urlUtil = BasiGX.util.Url;
         var templateConfig = {
             prefix: me.self.HOVER_TEMPLATE_PLACEHOLDER_PREFIX,
             suffix: me.self.HOVER_TEMPLATE_PLACEHOLDER_SUFFIX
         };
 
         Ext.each(layers, function(layer) {
-            innerHtml += '<b>' + layer.get('name') + '</b>';
+
+            var layerTitle = '<b>' + layer.get('name') + '</b>';
+            var hoverInfo = '';
+
             Ext.each(features, function(feat) {
                 if (feat && feat.get('layer') === layer) {
                     var hoverFieldProp = layer.get(hoverfieldProp);
@@ -617,12 +640,30 @@ Ext.define('BasiGX.plugin.Hover', {
 
                     if (layer.get('type') === 'WFSCluster') {
                         var count = feat.get('count');
-                        innerHtml += '<br />' + count + '<br />';
+                        hoverInfo += '<br />' + count;
                     } else {
-                        innerHtml += '<br />' + hoverText + '<br />';
+                        if (
+                            me.getEnableClickableLinks()
+                            && urlUtil.isUrl(hoverText)
+                        ) {
+                            hoverInfo += '<br /><a href="'
+                                + hoverText
+                                + '" target="_blank">'
+                                + hoverText
+                                + '</a>';
+                        } else {
+                            hoverInfo += '<br />' + hoverText;
+                        }
                     }
                 }
             });
+            if (hoverInfo) {
+                if (innerHtml.length === 0) {
+                    innerHtml += layerTitle + hoverInfo;
+                } else {
+                    innerHtml += '<br />' + layerTitle + hoverInfo;
+                }
+            }
         });
 
         return innerHtml;
@@ -651,7 +692,7 @@ Ext.define('BasiGX.plugin.Hover', {
         var blue;
 
         if (baseColor.length === 4 && Ext.isNumber(baseColor[0]) &&
-                Ext.isNumber(baseColor[1]) && Ext.isNumber(baseColor[2])) {
+            Ext.isNumber(baseColor[1]) && Ext.isNumber(baseColor[2])) {
             red = baseColor[0];
             green = baseColor[1];
             blue = baseColor[2];

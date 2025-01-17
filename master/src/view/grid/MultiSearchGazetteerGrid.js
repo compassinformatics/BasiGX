@@ -80,7 +80,8 @@ Ext.define('BasiGX.view.grid.MultiSearchGazetteerGrid', {
             text: '',
             xtype: 'templatecolumn',
             width: 40,
-            tpl: '<img src="{icon}" height="16" width="16">'
+            tpl: '<img src="https://nominatim.terrestris.de{icon}"' +
+                ' height="16" width="16">'
         }, {
             text: 'Name',
             xtype: 'templatecolumn',
@@ -131,7 +132,7 @@ Ext.define('BasiGX.view.grid.MultiSearchGazetteerGrid', {
      * Called once the grid turns hidden. Deactivates all related listeners for
      * interaction between grid and features on the map.
      */
-    unregisterListeners: function () {
+    unregisterListeners: function() {
         var me = this;
         me.un('itemmouseenter', me.onItemMouseEnter, me);
         me.un('itemmouseleave', me.onItemMouseLeave, me);
